@@ -20,6 +20,16 @@ npm run build
 npm run dev -- --host 127.0.0.1
 ```
 
+## GitHub Pages 部署
+
+仓库通过 `.github/workflows/deploy-pages.yml` 在每次推送 `main` 后构建并部署到：
+
+<https://inkknight.github.io/AutoChessLab/>
+
+首次部署前，在 GitHub 仓库的 `Settings → Pages → Build and deployment` 中将 Source 设为 `GitHub Actions`。Vite 的 `base` 已设置为 `/AutoChessLab/`，棋子图标与 Worker 资源都会从该仓库子路径加载。
+
+也可以在仓库的 Actions 页面手动运行 `Deploy GitHub Pages` 工作流。
+
 ## 数据再生成
 
 棋子、费用、羁绊、中文名和图标来自项目内精简保存的 `game-source/`。该目录只包含数据生成所需的 Lua、KV、本地化和棋子图标；完整 VPK 与反编译目录保留在项目外层：

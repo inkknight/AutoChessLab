@@ -3,6 +3,7 @@ import { ConfigPanel, type SynergyOption } from './components/ConfigPanel';
 import { OptimizationSummary } from './components/OptimizationSummary';
 import { ResultSummary } from './components/ResultSummary';
 import { UsageGuideDrawer } from './components/UsageGuideDrawer';
+import { resolvePublicAsset } from './data/asset-url';
 import { gameData } from './data/game-data.generated';
 import { banPrice as calculateBanPrice } from './data/rules';
 import { useSimulationWorker } from './hooks/useSimulationWorker';
@@ -79,7 +80,7 @@ export default function App() {
     synergies: piece.synergies,
     sourceOrder: 'order' in piece ? piece.order : 0,
     copies: 'initialCopies' in piece ? piece.initialCopies : undefined,
-    icon: piece.icon ?? undefined,
+    icon: resolvePublicAsset(piece.icon ?? undefined),
   })), []);
 
   const synergies = useMemo<SynergyOption[]>(() => gameData.synergies
