@@ -1,5 +1,5 @@
 import { gameData } from '../data/game-data.generated';
-import { banPrice, REROLL_COST } from '../data/rules';
+import { banPrice, levelUpgradeCost, REROLL_COST } from '../data/rules';
 import { AntiBadLuckState, generateShop } from './draw';
 import { Holdings } from './holdings';
 import { ChessPool } from './pool';
@@ -40,16 +40,18 @@ function result(
   diceRefund: number,
   ioPurchased: number,
   morningStarTriggers: number,
+  level: number,
   reason?: TrialResult['reason'],
 ): TrialResult {
+  const leveling = levelUpgradeCost(level);
   const reroll = activeRerolls * REROLL_COST;
   return {
     completed,
     ...(reason ? { reason } : {}),
-    netGold: reroll + purchases + ban - diceRefund,
+    netGold: leveling + reroll + purchases + ban - diceRefund,
     activeRerolls,
     peakBenchSlots,
-    costs: { reroll, purchases, ban, diceRefund },
+    costs: { leveling, reroll, purchases, ban, diceRefund },
     ioPurchased,
     morningStarTriggers,
   };
@@ -65,14 +67,14 @@ export function simulateTrial(config: SimulationConfig, trialIndex: number): Tri
     || uniqueTargets.size !== config.targets.length
     || config.targets.some((target) => !Number.isInteger(target.copies) || target.copies <= 0 || !pieceById.has(target.chessId))
     || config.targets.filter((target) => pieceById.get(target.chessId)?.cost === 5).length > 10;
-  if (invalid) return result(false, 0, 0, 0, 0, 0, 0, 0, 'invalid-config');
+  if (invalid) return result(false, 0, 0, 0, 0, 0, 0, 0, 5, 'invalid-config');
 
   const bannedIds = config.bannedSynergy
     ? pieces.filter((piece) => piece.synergies.includes(config.bannedSynergy!)).map((piece) => piece.id)
     : [];
   const banCost = config.bannedSynergy ? banPrice(bannedIds.length) : 0;
   if (config.targets.some((target) => bannedIds.includes(target.chessId))) {
-    return result(false, 0, 0, 0, banCost, 0, 0, 0, 'impossible');
+    return result(false, 0, 0, 0, banCost, 0, 0, 0, config.level, 'impossible');
   }
 
   const rng = createTrialRng(config, trialIndex);
@@ -108,7 +110,7 @@ export function simulateTrial(config: SimulationConfig, trialIndex: number): Tri
     firstShop = false;
     if (shop.impossible) {
       shop.returnUnpurchased();
-      return result(false, activeRerolls, holdings.peakBenchSlots, purchases, banCost, diceRefund, ioPurchased, morningStarTriggers, 'impossible');
+      return result(false, activeRerolls, holdings.peakBenchSlots, purchases, banCost, diceRefund, ioPurchased, morningStarTriggers, config.level, 'impossible');
     }
 
     if (config.relic === 'weighted-dice') {
@@ -128,10 +130,10 @@ export function simulateTrial(config: SimulationConfig, trialIndex: number): Tri
     const purchasedIndices = new Set(purchased.purchasedIndices);
     if (purchased.completed) {
       shop.returnUnpurchased(purchasedIndices);
-      return result(true, activeRerolls, holdings.peakBenchSlots, purchases, banCost, diceRefund, ioPurchased, morningStarTriggers);
+      return result(true, activeRerolls, holdings.peakBenchSlots, purchases, banCost, diceRefund, ioPurchased, morningStarTriggers, config.level);
     }
     recent = shop.returnUnpurchased(purchasedIndices);
   }
 
-  return result(false, activeRerolls, holdings.peakBenchSlots, purchases, banCost, diceRefund, ioPurchased, morningStarTriggers, 'max-rerolls');
+  return result(false, activeRerolls, holdings.peakBenchSlots, purchases, banCost, diceRefund, ioPurchased, morningStarTriggers, config.level, 'max-rerolls');
 }

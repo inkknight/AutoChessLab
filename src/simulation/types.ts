@@ -40,6 +40,7 @@ export interface ShopItem {
 }
 
 export interface TrialCosts {
+  leveling: number;
   reroll: number;
   purchases: number;
   ban: number;

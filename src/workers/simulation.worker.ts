@@ -67,7 +67,11 @@ async function runSimulation(requestId: string, config: Extract<WorkerRequest, {
   }
 }
 
-async function runOptimizationRequest(requestId: string, config: Extract<WorkerRequest, { type: 'optimize' }>['config']) {
+async function runOptimizationRequest(
+  requestId: string,
+  config: Extract<WorkerRequest, { type: 'optimize' }>['config'],
+  locks: Extract<WorkerRequest, { type: 'optimize' }>['locks'],
+) {
   activeRequestId = requestId;
   cancelledRequests.delete(requestId);
 
@@ -84,7 +88,7 @@ async function runOptimizationRequest(requestId: string, config: Extract<WorkerR
       onProgress: (progress) => post({ type: 'optimization-progress', requestId, ...progress }),
       yieldControl: yieldToEventLoop,
       batchSize: BATCH_SIZE,
-    });
+    }, locks);
     const result: OptimizationResult = { version: WORKER_PROTOCOL_VERSION, ...optimized };
     post({ type: 'optimization-complete', requestId, result });
   } catch (error) {
@@ -110,7 +114,7 @@ context.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
     cancelledRequests.add(activeRequestId);
   }
   if (message.type === 'optimize') {
-    void runOptimizationRequest(message.requestId, message.config);
+    void runOptimizationRequest(message.requestId, message.config, message.locks);
   } else {
     void runSimulation(message.requestId, message.config);
   }

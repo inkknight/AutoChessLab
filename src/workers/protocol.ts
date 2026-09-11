@@ -1,4 +1,4 @@
-import type { OptimizationPhase, RankedOptimizationEntry } from '../simulation/optimizer';
+import type { OptimizationLocks, OptimizationPhase, RankedOptimizationEntry } from '../simulation/optimizer';
 import type { AggregateResult, SimulationConfig } from '../simulation/types';
 
 export const WORKER_PROTOCOL_VERSION = 1 as const;
@@ -30,6 +30,7 @@ export type WorkerRequest =
       type: 'optimize';
       requestId: string;
       config: SimulationConfig;
+      locks: OptimizationLocks;
     }
   | {
       type: 'cancel';

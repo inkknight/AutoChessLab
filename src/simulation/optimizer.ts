@@ -10,6 +10,22 @@ export interface OptimizationChoice {
   useIo: boolean;
 }
 
+export interface OptimizationLocks {
+  level: boolean;
+  relic: boolean;
+  talent: boolean;
+  bannedSynergy: boolean;
+  useIo: boolean;
+}
+
+export const DEFAULT_OPTIMIZATION_LOCKS: Readonly<OptimizationLocks> = {
+  level: false,
+  relic: false,
+  talent: false,
+  bannedSynergy: false,
+  useIo: false,
+};
+
 export interface OptimizationSynergy {
   id: string;
   pieceIds: readonly string[];
@@ -68,6 +84,7 @@ export function enumerateOptimizationChoices(
   base: SimulationConfig,
   pieces: readonly ChessPiece[],
   synergies: readonly OptimizationSynergy[],
+  locks: OptimizationLocks = DEFAULT_OPTIMIZATION_LOCKS,
 ): OptimizationChoice[] {
   const activeIds = new Set(pieces.map((piece) => piece.id));
   const targetIds = new Set(base.targets.map((target) => target.chessId));
@@ -76,14 +93,20 @@ export function enumerateOptimizationChoices(
     .filter((synergy) => synergy.pieceIds.every((id) => !targetIds.has(id)))
     .map((synergy) => synergy.id)
     .sort();
-  const bans: Array<string | null> = [null, ...legalBans];
+  const bans: Array<string | null> = locks.bannedSynergy ? [base.bannedSynergy] : [null, ...legalBans];
+  const levels = locks.level ? [base.level] : [5, 6, 7, 8, 9, 10];
+  const relics: readonly Relic[] = locks.relic
+    ? [base.relic]
+    : ['none', 'weighted-dice', 'morning-star', 'remainder-seeker'];
+  const talents: readonly Talent[] = locks.talent ? [base.talent] : ['greed', 'promotion'];
+  const ioChoices = locks.useIo ? [base.useIo] : [false, true];
   const choices: OptimizationChoice[] = [];
 
-  for (let level = 5; level <= 10; level += 1) {
-    for (const relic of ['none', 'weighted-dice', 'morning-star', 'remainder-seeker'] as const) {
-      for (const talent of ['greed', 'promotion'] as const) {
+  for (const level of levels) {
+    for (const relic of relics) {
+      for (const talent of talents) {
         for (const bannedSynergy of bans) {
-          for (const useIo of [false, true]) {
+          for (const useIo of ioChoices) {
             choices.push({ level, relic, talent, bannedSynergy, useIo });
           }
         }
@@ -223,8 +246,9 @@ export async function runOptimization(
   pieces: readonly ChessPiece[],
   synergies: readonly OptimizationSynergy[],
   options: OptimizationRunOptions,
+  locks: OptimizationLocks = DEFAULT_OPTIMIZATION_LOCKS,
 ): Promise<OptimizationRunResult> {
-  const choices = enumerateOptimizationChoices(base, pieces, synergies);
+  const choices = enumerateOptimizationChoices(base, pieces, synergies, locks);
   const coarseTrials = coarseTrialCount(base.trials);
   const screened = await runPhase(base, choices, 'screen', coarseTrials, options);
   const screenRanking = rankOptimizationEntries(screened.entries, 100, 0.04);

@@ -109,13 +109,12 @@ export class Holdings {
   }
 
   purchaseNormal(id: string, cost: Cost, morningStar: boolean, rng: RandomSource, ownedAtGeneration = this.hasOwned(id)): PurchaseResult {
-    const autoCombine = this.count(id, 1) >= 2;
-    if (autoCombine) {
+    if (!morningStar && this.count(id, 1) >= 2) {
       this.addNormal(id, 1, true);
       return { morningStarTriggered: false };
     }
     const triggered = morningStar && ownedAtGeneration && rng.chance(MORNING_STAR_CHANCE[cost]);
-    this.addNormal(id, triggered ? 2 : 1, false);
+    this.addNormal(id, triggered ? 2 : 1, !triggered);
     return { morningStarTriggered: triggered };
   }
 

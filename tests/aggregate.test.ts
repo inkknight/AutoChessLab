@@ -8,7 +8,7 @@ const trial = (netGold: number, completed = true): TrialResult => ({
   netGold,
   activeRerolls: netGold / 2,
   peakBenchSlots: netGold,
-  costs: { reroll: netGold, purchases: 2, ban: 3, diceRefund: 1 },
+  costs: { leveling: 48, reroll: netGold, purchases: 2, ban: 3, diceRefund: 1 },
   ioPurchased: 1,
   morningStarTriggers: 0,
 });
@@ -38,9 +38,14 @@ describe('aggregateResults', () => {
     expect(aggregate.incompleteReasons).toEqual({ 'max-rerolls': 1 });
   });
 
+  it('aggregates the level-up spending component', () => {
+    const aggregate = aggregateResults([trial(2), trial(4)], 7);
+    expect(aggregate.meanCosts.leveling).toBe(48);
+  });
+
   it('returns null summaries and zero means when no trial completes', () => {
     const aggregate = aggregateResults([trial(100, false)], 8);
     expect(aggregate.netGold).toBeNull();
-    expect(aggregate.meanCosts).toEqual({ reroll: 0, purchases: 0, ban: 0, diceRefund: 0 });
+    expect(aggregate.meanCosts).toEqual({ leveling: 0, reroll: 0, purchases: 0, ban: 0, diceRefund: 0 });
   });
 });

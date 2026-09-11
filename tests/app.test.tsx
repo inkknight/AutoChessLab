@@ -72,7 +72,7 @@ const result = {
   netGold: { count: 9800, mean: 52.4, variance: 16, min: 30, max: 81, p10: 42, p25: 47, p50: 52, p75: 58, p90: 64, p95: 69, frequency: { 30: 100, 52: 5000, 81: 4700 } },
   activeRerolls: { count: 9800, mean: 17.2, variance: 9, min: 4, max: 35, p10: 10, p25: 13, p50: 17, p75: 21, p90: 25, p95: 28, frequency: { 4: 300, 17: 6000, 35: 3500 } },
   peakBenchSlots: { count: 9800, mean: 6.3, variance: 2, min: 2, max: 11, p10: 4, p25: 5, p50: 6, p75: 7, p90: 9, p95: 10, frequency: { 2: 300, 6: 6000, 11: 3500 } },
-  meanCosts: { reroll: 34.4, purchases: 19.3, ban: 4, diceRefund: 5.3 },
+  meanCosts: { leveling: 96, reroll: 34.4, purchases: 19.3, ban: 4, diceRefund: 5.3 },
   meanIoPurchased: 0.4,
   meanMorningStarTriggers: 0.2,
   incompleteReasons: { 'max-rerolls': 200 },
@@ -99,6 +99,27 @@ afterEach(() => {
 });
 
 describe('Auto Chess simulator UI', () => {
+  it('opens usage instructions in a dismissible drawer without an oversized hero', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '构建你的搜牌场景' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '模拟假设' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '使用说明' }));
+    const drawer = screen.getByRole('dialog', { name: '使用说明' });
+    expect(drawer).toBeInTheDocument();
+    expect(within(drawer).getByRole('heading', { name: '锁定最优配置维度' })).toBeInTheDocument();
+    expect(within(drawer).getByText(/净金币 = 升级支出/)).toBeInTheDocument();
+    expect(within(drawer).getByRole('heading', { name: '启明星与自动合成' })).toBeInTheDocument();
+    expect(within(drawer).getByText(/先进行启明星判定/)).toBeInTheDocument();
+    expect(within(drawer).getByRole('heading', { name: '模型假设' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: '使用说明' })).not.toBeInTheDocument();
+  });
+
   it('filters by race and class, searches synergy names, and batch-adds checked pieces', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -126,6 +147,14 @@ describe('Auto Chess simulator UI', () => {
     expect(screen.getAllByRole('spinbutton', { name: '目标一星等价份数' })).toHaveLength(2);
     expect(screen.getByText('斧王', { selector: '.target-name' })).toBeInTheDocument();
     expect(screen.getByText('潮汐猎人', { selector: '.target-name' })).toBeInTheDocument();
+  });
+
+  it('explains the Morning Star combination override when selected', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.selectOptions(screen.getByLabelText('搜牌圣物'), 'morning-star');
+    expect(screen.getByRole('note')).toHaveTextContent('启明星会关闭购买前自动合成');
   });
 
   it('combines race and class filters', async () => {
@@ -181,9 +210,10 @@ describe('Auto Chess simulator UI', () => {
     await user.click(screen.getByRole('option', { name: /斧王/ }));
     await user.click(screen.getByRole('button', { name: '添加已选棋子（1）' }));
     await user.selectOptions(screen.getByLabelText('玩家等级'), '8');
+    expect(screen.getByText('从 5 级升级需 96 金')).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: /扬升/ }));
     await user.selectOptions(screen.getByLabelText('搜牌圣物'), 'weighted-dice');
-    await user.click(screen.getByLabelText(/使用精灵球/));
+    await user.click(screen.getByRole('checkbox', { name: '使用精灵球' }));
     await user.clear(screen.getByLabelText('随机种子'));
     await user.type(screen.getByLabelText('随机种子'), 'ui-test');
     await user.click(screen.getByRole('button', { name: '开始模拟' }));
@@ -202,14 +232,33 @@ describe('Auto Chess simulator UI', () => {
     expect(worker().messages.at(-1)).toEqual({ type: 'cancel', requestId: runMessage.requestId });
   });
 
-  it('sends an optimization request and reports coarse progress', async () => {
+  it('sends an optimization request with dimension locks and reports coarse progress', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.type(screen.getByRole('combobox', { name: '搜索棋子' }), '斧王');
     await user.click(screen.getByRole('option', { name: /斧王/ }));
     await user.click(screen.getByRole('button', { name: '添加已选棋子（1）' }));
+    expect(screen.getByRole('button', { name: '锁定玩家等级' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '锁定玩家等级' })).toHaveTextContent('未锁定');
+    expect(screen.getByRole('button', { name: '锁定搜牌圣物' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '锁定15 回合天赋' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '锁定是否使用精灵球' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '锁定羁绊 Ban' })).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(screen.getByRole('button', { name: '锁定玩家等级' }));
+    await user.selectOptions(screen.getByLabelText('玩家等级'), '7');
+    await user.click(screen.getByRole('button', { name: '锁定是否使用精灵球' }));
+    await user.click(screen.getByRole('button', { name: '锁定羁绊 Ban' }));
+    expect(screen.getByRole('button', { name: '解锁玩家等级' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '解锁玩家等级' })).toHaveTextContent('已锁定');
+    expect(screen.getByLabelText('玩家等级')).toHaveValue('7');
     await user.click(screen.getByRole('button', { name: '计算最优配置' }));
+    expect(screen.getByRole('button', { name: '解锁玩家等级' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '锁定搜牌圣物' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '锁定15 回合天赋' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '解锁是否使用精灵球' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '解锁羁绊 Ban' })).toBeDisabled();
 
     const postedOptimize = FakeWorker.posted.find((entry) => (entry.message as { type?: string }).type === 'optimize');
     const optimizeMessage = postedOptimize?.message as { type: string; requestId: string; config: Record<string, unknown> };
@@ -220,6 +269,13 @@ describe('Auto Chess simulator UI', () => {
         relic: 'none',
         trials: 10000,
         seed: 'autochess',
+      },
+      locks: {
+        level: true,
+        relic: false,
+        talent: false,
+        useIo: true,
+        bannedSynergy: true,
       },
     });
 
@@ -245,6 +301,7 @@ describe('Auto Chess simulator UI', () => {
     await user.click(screen.getByRole('option', { name: /斧王/ }));
     await user.click(screen.getByRole('button', { name: '添加已选棋子（1）' }));
     await user.selectOptions(screen.getByLabelText('搜牌圣物'), 'morning-star');
+    await user.click(screen.getByRole('button', { name: '锁定搜牌圣物' }));
     await user.clear(screen.getByLabelText('随机种子'));
     await user.type(screen.getByLabelText('随机种子'), 'keep-this-seed');
     await user.click(screen.getByRole('button', { name: '计算最优配置' }));
@@ -280,10 +337,12 @@ describe('Auto Chess simulator UI', () => {
     expect(screen.getByLabelText('玩家等级')).toHaveValue('6');
     expect(screen.getByRole('radio', { name: /扬升/ })).toBeChecked();
     expect(screen.getByLabelText('羁绊 Ban')).toHaveValue('is_mage');
-    expect(screen.getByLabelText(/使用精灵球/)).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '使用精灵球' })).toBeChecked();
     expect(screen.getByLabelText('搜牌圣物')).toHaveValue('weighted-dice');
+    expect(screen.getByRole('button', { name: '解锁搜牌圣物' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('随机种子')).toHaveValue('keep-this-seed');
     expect(screen.getByLabelText('模拟次数')).toHaveValue('10000');
+    expect(screen.getByRole('button', { name: '锁定玩家等级' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('斧王', { selector: '.target-name' })).toBeInTheDocument();
   });
 
@@ -304,6 +363,9 @@ describe('Auto Chess simulator UI', () => {
     expect(screen.getByText('52.4')).toBeInTheDocument();
     expect(screen.getByText('98.0%')).toBeInTheDocument();
     expect(screen.getAllByRole('img', { name: /分布直方图/ })).toHaveLength(3);
+    expect(screen.getByText('净金币 = 升级 + 刷新 + 购买 + Ban − 骰子返还')).toBeInTheDocument();
+    expect(screen.getByText('升级支出', { selector: 'dt' })).toBeInTheDocument();
+    expect(screen.getByText('96', { selector: 'dd' })).toBeInTheDocument();
 
     const benchPanel = screen.getByRole('region', { name: '峰值棋子占用分布' });
     await user.click(within(benchPanel).getByRole('button', { name: '累计分布' }));
@@ -321,12 +383,14 @@ describe('Auto Chess simulator UI', () => {
     await user.click(screen.getByRole('option', { name: /斧王/ }));
     await user.click(screen.getByRole('button', { name: '添加已选棋子（1）' }));
     await user.selectOptions(screen.getByLabelText('玩家等级'), '7');
+    await user.click(screen.getByRole('button', { name: '锁定玩家等级' }));
     await user.clear(screen.getByLabelText('随机种子'));
     await user.type(screen.getByLabelText('随机种子'), 'persisted-seed');
     unmount();
 
     render(<App />);
     expect(screen.getByLabelText('玩家等级')).toHaveValue('7');
+    expect(screen.getByRole('button', { name: '解锁玩家等级' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('随机种子')).toHaveValue('persisted-seed');
     expect(screen.getByText('斧王', { selector: '.target-name' })).toBeInTheDocument();
   });

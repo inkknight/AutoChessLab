@@ -37,6 +37,7 @@ export function aggregateResults(results: readonly TrialResult[], level: number)
   const mean = (select: (trial: TrialResult) => number): number =>
     completed.length === 0 ? 0 : completed.reduce((sum, trial) => sum + select(trial), 0) / completed.length;
   const meanCosts: TrialCosts = {
+    leveling: mean((trial) => trial.costs.leveling),
     reroll: mean((trial) => trial.costs.reroll),
     purchases: mean((trial) => trial.costs.purchases),
     ban: mean((trial) => trial.costs.ban),

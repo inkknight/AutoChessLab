@@ -97,12 +97,37 @@ describe('holdings and purchases', () => {
     expect(result.completed).toBe(true);
   });
 
-  it('checks auto-combine before morning star', () => {
-    const holdings = new Holdings([{ chessId: 'a', copies: 6 }], new Map([['a', 1]]));
+  it('checks morning star before combining an existing one-star pair', () => {
+    const holdings = new Holdings([{ chessId: 'a', copies: 9 }], new Map([['a', 1]]));
     holdings.addNormal('a', 1);
     holdings.addNormal('a', 1);
     const result = holdings.purchaseNormal('a', 1, true, always);
+    expect(result.morningStarTriggered).toBe(true);
+    expect(holdings.count('a', 1)).toBe(2);
+    expect(holdings.count('a', 2)).toBe(1);
+    expect(holdings.progress('a')).toBe(5);
+    expect(holdings.peakBenchSlots).toBe(3);
+  });
+
+  it('combines immediately after morning star misses', () => {
+    const holdings = new Holdings([{ chessId: 'a', copies: 9 }], new Map([['a', 1]]));
+    holdings.addNormal('a', 1);
+    holdings.addNormal('a', 1);
+    const result = holdings.purchaseNormal('a', 1, true, never);
     expect(result.morningStarTriggered).toBe(false);
+    expect(holdings.count('a', 1)).toBe(0);
+    expect(holdings.count('a', 2)).toBe(1);
+    expect(holdings.progress('a')).toBe(3);
+    expect(holdings.peakBenchSlots).toBe(2);
+  });
+
+  it('keeps pre-purchase auto-combine for non-morning-star relics', () => {
+    const holdings = new Holdings([{ chessId: 'a', copies: 9 }], new Map([['a', 1]]));
+    holdings.addNormal('a', 1);
+    holdings.addNormal('a', 1);
+    const result = holdings.purchaseNormal('a', 1, false, always);
+    expect(result.morningStarTriggered).toBe(false);
+    expect(holdings.count('a', 2)).toBe(1);
     expect(holdings.progress('a')).toBe(3);
   });
 

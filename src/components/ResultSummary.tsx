@@ -38,8 +38,9 @@ export function ResultSummary({ result }: { result: SimulationResult }) {
       </div>
 
       <section className="cost-breakdown" aria-labelledby="cost-title">
-        <div><h3 id="cost-title">平均金币拆分</h3><p>净金币 = 刷新 + 购买 + Ban − 骰子返还</p></div>
+        <div><h3 id="cost-title">平均金币拆分</h3><p>净金币 = 升级 + 刷新 + 购买 + Ban − 骰子返还</p></div>
         <dl>
+          <div><dt>升级支出</dt><dd>{number(result.meanCosts.leveling)}</dd></div>
           <div><dt>刷新支出</dt><dd>{number(result.meanCosts.reroll)}</dd></div>
           <div><dt>目标 / IO 购买</dt><dd>{number(result.meanCosts.purchases)}</dd></div>
           <div><dt>羁绊 Ban</dt><dd>{number(result.meanCosts.ban)}</dd></div>

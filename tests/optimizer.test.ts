@@ -6,6 +6,7 @@ import {
   rankOptimizationEntries,
   type OptimizationChoice,
   type OptimizationEntry,
+  type OptimizationLocks,
 } from '../src/simulation/optimizer';
 import type { AggregateResult, ChessPiece, MetricSummary, SimulationConfig } from '../src/simulation/types';
 
@@ -56,7 +57,7 @@ function aggregate(completionRate: number, meanGold: number | null): AggregateRe
     netGold: meanGold === null ? null : metric(meanGold),
     activeRerolls: meanGold === null ? null : metric(10),
     peakBenchSlots: meanGold === null ? null : metric(4),
-    meanCosts: { reroll: 0, purchases: 0, ban: 0, diceRefund: 0 },
+    meanCosts: { leveling: 0, reroll: 0, purchases: 0, ban: 0, diceRefund: 0 },
     meanIoPurchased: 0,
     meanMorningStarTriggers: 0,
   };
@@ -89,6 +90,47 @@ describe('optimization candidate enumeration', () => {
     expect(choices.some((choice) => choice.bannedSynergy === 'is_target')).toBe(false);
     expect(choices.some((choice) => choice.bannedSynergy === 'is_empty')).toBe(false);
     expect(choices[0]).toEqual({ level: 5, relic: 'none', talent: 'greed', bannedSynergy: null, useIo: false });
+  });
+
+  it('keeps locked dimensions fixed while enumerating unlocked dimensions', () => {
+    const locks: OptimizationLocks = {
+      level: true,
+      relic: true,
+      talent: false,
+      useIo: true,
+      bannedSynergy: false,
+    };
+    const choices = enumerateOptimizationChoices(base, pieces, [
+      { id: 'is_target', pieceIds: ['target'] },
+      { id: 'is_useful', pieceIds: ['other'] },
+    ], locks);
+
+    expect(choices).toHaveLength(4);
+    expect(new Set(choices.map((choice) => choice.level))).toEqual(new Set([8]));
+    expect(new Set(choices.map((choice) => choice.relic))).toEqual(new Set(['morning-star']));
+    expect(new Set(choices.map((choice) => choice.useIo))).toEqual(new Set([false]));
+    expect(new Set(choices.map((choice) => choice.talent))).toEqual(new Set(['greed', 'promotion']));
+    expect(new Set(choices.map((choice) => choice.bannedSynergy))).toEqual(new Set([null, 'is_useful']));
+  });
+
+  it('locks the current no-Ban selection instead of exploring legal Bans', () => {
+    const choices = enumerateOptimizationChoices(base, pieces, [
+      { id: 'is_useful', pieceIds: ['other'] },
+    ], {
+      level: true,
+      relic: true,
+      talent: true,
+      useIo: true,
+      bannedSynergy: true,
+    });
+
+    expect(choices).toEqual([{
+      level: 8,
+      relic: 'morning-star',
+      talent: 'greed',
+      bannedSynergy: null,
+      useIo: false,
+    }]);
   });
 
   it('uses fifty trials for the initial screen', () => {

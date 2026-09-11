@@ -9,7 +9,11 @@ async function addTarget(page: import('@playwright/test').Page, query: string, n
 test.describe('Auto Chess simulator', () => {
   test('configures targets, runs, changes views, cancels, and restores configuration', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('多久能搜到');
+    await expect(page.getByRole('heading', { name: '构建你的搜牌场景' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(0);
+    await page.getByRole('button', { name: '使用说明' }).click();
+    await expect(page.getByRole('dialog', { name: '使用说明' })).toBeVisible();
+    await page.getByRole('button', { name: '关闭使用说明' }).last().click();
 
     await page.getByRole('combobox', { name: '种族筛选' }).selectOption('is_orc');
     await addTarget(page, '斧王', '斧王');
@@ -17,10 +21,10 @@ test.describe('Auto Chess simulator', () => {
     await page.getByRole('combobox', { name: '职业筛选' }).selectOption('is_mage');
     await addTarget(page, 'chess_lina', '秀逗魔导士');
     await page.getByRole('button', { name: '添加已选棋子（2）' }).click();
-    await page.getByLabel('玩家等级').selectOption('8');
+    await page.getByLabel('玩家等级', { exact: true }).selectOption('8');
     await page.getByRole('radio', { name: /扬升/ }).check();
-    await page.getByLabel('搜牌圣物').selectOption('weighted-dice');
-    await page.getByLabel(/使用精灵球/).check();
+    await page.getByLabel('搜牌圣物', { exact: true }).selectOption('weighted-dice');
+    await page.getByRole('checkbox', { name: '使用精灵球' }).check();
     await page.getByLabel('随机种子').fill('playwright-smoke');
     await page.getByLabel('单局最大主动刷新').fill('1000');
 
@@ -44,7 +48,7 @@ test.describe('Auto Chess simulator', () => {
 
     await page.getByLabel('模拟次数').selectOption('10000');
     await page.reload();
-    await expect(page.getByLabel('玩家等级')).toHaveValue('8');
+    await expect(page.getByLabel('玩家等级', { exact: true })).toHaveValue('8');
     await expect(page.getByLabel('随机种子')).toHaveValue('cancelled-then-rerun');
     await expect(page.locator('.target-name')).toContainText(['斧王', '秀逗魔导士']);
   });
@@ -68,20 +72,23 @@ test.describe('Auto Chess simulator', () => {
     await page.getByRole('button', { name: '应用第 1 名配置' }).click();
     const level = recommendation?.match(/(\d+) 级/)?.[1];
     if (!level) throw new Error(`Cannot parse recommended level from ${recommendation}`);
-    await expect(page.getByLabel('玩家等级')).toHaveValue(level);
+    await expect(page.getByLabel('玩家等级', { exact: true })).toHaveValue(level);
     if (recommendation?.includes('扬升')) await expect(page.getByRole('radio', { name: /扬升/ })).toBeChecked();
     if (recommendation?.includes('贪婪')) await expect(page.getByRole('radio', { name: /贪婪/ })).toBeChecked();
-    await expect(page.getByLabel(/使用精灵球/)).toBeChecked({ checked: recommendation?.endsWith(' · 使用 IO') ?? false });
+    await expect(page.getByRole('checkbox', { name: '使用精灵球' })).toBeChecked({ checked: recommendation?.endsWith(' · 使用 IO') ?? false });
     expect((await page.screenshot({ fullPage: true })).byteLength).toBeGreaterThan(10_000);
   });
 
   test('remains usable at a narrow viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '构建你的搜牌场景' })).toBeVisible();
     await addTarget(page, '斧王', '斧王');
     await page.getByRole('button', { name: '添加已选棋子（1）' }).click();
     await expect(page.getByRole('button', { name: '开始模拟' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '模拟假设' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '使用说明' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '锁定玩家等级' })).toContainText('未锁定');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 });

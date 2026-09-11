@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { OptimizationPhase } from '../simulation/optimizer';
+import type { OptimizationLocks, OptimizationPhase } from '../simulation/optimizer';
 import type { SimulationConfig } from '../simulation/types';
 import type { OptimizationResult, SimulationResult, WorkerRequest, WorkerResponse } from '../workers/protocol';
 
@@ -116,11 +116,11 @@ export function useSimulationWorker() {
     ensureWorker().postMessage(message);
   }, [createRequestId, ensureWorker]);
 
-  const optimize = useCallback((config: SimulationConfig) => {
+  const optimize = useCallback((config: SimulationConfig, locks: OptimizationLocks) => {
     const requestId = createRequestId();
     activeRequestRef.current = requestId;
     setState({ ...initialState, status: 'running', mode: 'optimization' });
-    const message: WorkerRequest = { type: 'optimize', requestId, config };
+    const message: WorkerRequest = { type: 'optimize', requestId, config, locks };
     ensureWorker().postMessage(message);
   }, [createRequestId, ensureWorker]);
 

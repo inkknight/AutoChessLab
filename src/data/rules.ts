@@ -7,6 +7,27 @@ export const IO_CHANCE = 20 / 10_000;
 export const SSR_FIRST_ROLL_CHANCE = 1 / 10_000;
 export const SSR_SECOND_ROLL_CHANCE = 1 / 10_000;
 export const PROMOTION_CHANCE = 0.5;
+
+// Source: addon_game_mode.lua HeroExpTable. Buying experience costs 1 gold per XP.
+const CUMULATIVE_EXPERIENCE: Readonly<Record<number, number>> = {
+  1: 0,
+  2: 1,
+  3: 2,
+  4: 6,
+  5: 14,
+  6: 30,
+  7: 62,
+  8: 110,
+  9: 166,
+  10: 230,
+  11: 294,
+};
+
+export function levelUpgradeCost(targetLevel: number): number {
+  if (targetLevel <= 5) return 0;
+  return CUMULATIVE_EXPERIENCE[targetLevel] - CUMULATIVE_EXPERIENCE[5];
+}
+
 export const DEFAULT_COPIES_BY_COST: Readonly<Record<Cost, number>> = {
   1: 20,
   2: 20,

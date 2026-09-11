@@ -20,10 +20,16 @@ describe('simulateTrial', () => {
     expect(simulateTrial(base, 9)).toEqual(simulateTrial({ ...base, trials: 1000 }, 9));
   });
 
-  it('uses the net gold accounting formula', () => {
-    const result = simulateTrial({ ...base, relic: 'weighted-dice' }, 2);
-    expect(result.netGold).toBe(result.costs.reroll + result.costs.purchases + result.costs.ban - result.costs.diceRefund);
+  it('includes cumulative level-up spending in the net gold accounting formula', () => {
+    const result = simulateTrial({ ...base, level: 7, relic: 'weighted-dice' }, 2);
+    expect(result.costs.leveling).toBe(48);
+    expect(result.netGold).toBe(result.costs.leveling + result.costs.reroll + result.costs.purchases + result.costs.ban - result.costs.diceRefund);
     expect(result.costs.reroll).toBe(result.activeRerolls * 2);
+  });
+
+  it('does not charge level-up spending at the level-five baseline', () => {
+    const result = simulateTrial({ ...base, level: 5 }, 2);
+    expect(result.costs.leveling).toBe(0);
   });
 
   it('stops at the active reroll guard', () => {

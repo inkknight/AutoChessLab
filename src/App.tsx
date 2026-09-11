@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ConfigPanel, type SynergyOption } from './components/ConfigPanel';
 import { OptimizationSummary } from './components/OptimizationSummary';
 import { ResultSummary } from './components/ResultSummary';
-import { RuleSummary } from './components/RuleSummary';
+import { UsageGuideDrawer } from './components/UsageGuideDrawer';
 import { gameData } from './data/game-data.generated';
 import { banPrice as calculateBanPrice } from './data/rules';
 import { useSimulationWorker } from './hooks/useSimulationWorker';
-import type { OptimizationChoice } from './simulation/optimizer';
+import { DEFAULT_OPTIMIZATION_LOCKS, type OptimizationChoice, type OptimizationLocks } from './simulation/optimizer';
 import type { ChessPiece, SimulationConfig } from './simulation/types';
 
 const STORAGE_KEY = 'autochess-simulator-config-v1';
 const CONFIG_VERSION = 1;
+
+const defaultLocks: OptimizationLocks = { ...DEFAULT_OPTIMIZATION_LOCKS };
 
 const defaultConfig: SimulationConfig = {
   targets: [],
@@ -24,24 +26,50 @@ const defaultConfig: SimulationConfig = {
   maxActiveRerolls: 5000,
 };
 
-function readConfig(): SimulationConfig {
+interface StoredState {
+  version?: number;
+  config?: Partial<SimulationConfig>;
+  optimizationLocks?: Partial<OptimizationLocks>;
+}
+
+function readStoredState(): StoredState | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return defaultConfig;
-    const parsed = JSON.parse(stored) as { version?: number; config?: Partial<SimulationConfig> };
-    if (parsed.version !== CONFIG_VERSION || !parsed.config) return defaultConfig;
-    return {
-      ...defaultConfig,
-      ...parsed.config,
-      targets: Array.isArray(parsed.config.targets) ? parsed.config.targets : [],
-    };
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as StoredState;
+    return parsed.version === CONFIG_VERSION ? parsed : null;
   } catch {
-    return defaultConfig;
+    return null;
   }
+}
+
+function readConfig(): SimulationConfig {
+  const parsed = readStoredState();
+  if (!parsed?.config) return defaultConfig;
+  return {
+    ...defaultConfig,
+    ...parsed.config,
+    targets: Array.isArray(parsed.config.targets) ? parsed.config.targets : [],
+  };
+}
+
+function readOptimizationLocks(): OptimizationLocks {
+  const stored = readStoredState()?.optimizationLocks;
+  if (!stored) return defaultLocks;
+  return {
+    level: stored.level === true,
+    relic: stored.relic === true,
+    talent: stored.talent === true,
+    bannedSynergy: stored.bannedSynergy === true,
+    useIo: stored.useIo === true,
+  };
 }
 
 export default function App() {
   const [config, setConfig] = useState<SimulationConfig>(readConfig);
+  const [optimizationLocks, setOptimizationLocks] = useState<OptimizationLocks>(readOptimizationLocks);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const closeGuide = useCallback(() => setGuideOpen(false), []);
   const simulation = useSimulationWorker();
 
   const pieces = useMemo<ChessPiece[]>(() => gameData.pieces.map((piece) => ({
@@ -78,8 +106,8 @@ export default function App() {
 
   useEffect(() => {
     if (conflict) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: CONFIG_VERSION, config }));
-  }, [config, conflict]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: CONFIG_VERSION, config, optimizationLocks }));
+  }, [config, conflict, optimizationLocks]);
 
   const applyOptimizationChoice = (choice: OptimizationChoice) => {
     setConfig((current) => ({
@@ -96,15 +124,13 @@ export default function App() {
     <div className="app-shell">
       <header className="site-header">
         <div className="brand"><span className="brand-mark" aria-hidden="true">AC</span><span><strong>Auto Chess Lab</strong><small>阵容搜牌概率计算器</small></span></div>
-        <a href="#assumptions-title">查看模型假设</a>
+        <button className="guide-trigger" type="button" onClick={() => setGuideOpen(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.3 2.3 0 1 1 3.7 1.8c-.9.6-1.5 1-1.5 2.2M12 17h.01" /></svg>
+          使用说明
+        </button>
       </header>
 
       <main>
-        <section className="hero">
-          <div><span className="eyebrow">可复现 Monte Carlo 模拟</span><h1>把“多久能搜到”<br />变成一组可读的概率。</h1></div>
-          <p>配置目标阵容与对局规则，计算净金币、主动刷新次数和理论峰值棋子占用分布。计算完全在浏览器本地运行。</p>
-        </section>
-
         <div className="workspace-grid">
           <div className="config-column">
             <ConfigPanel
@@ -114,12 +140,13 @@ export default function App() {
               running={simulation.status === 'running'}
               conflict={conflict}
               banPrice={calculateBanPrice(affectedCount)}
+              optimizationLocks={optimizationLocks}
               onChange={setConfig}
+              onLocksChange={setOptimizationLocks}
               onRun={() => simulation.run(config)}
-              onOptimize={() => simulation.optimize(config)}
+              onOptimize={() => simulation.optimize(config, optimizationLocks)}
               onCancel={simulation.cancel}
             />
-            <RuleSummary />
           </div>
 
           <div className="result-column" aria-live="polite">
@@ -155,6 +182,7 @@ export default function App() {
         </div>
       </main>
       <footer><span>规则来源：反编译服务器脚本</span><span>本工具用于模型分析，不代表实战保证</span></footer>
+      <UsageGuideDrawer open={guideOpen} onClose={closeGuide} />
     </div>
   );
 }

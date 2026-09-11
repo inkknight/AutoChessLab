@@ -3,6 +3,7 @@ import { aggregateResults } from '../src/simulation/aggregate';
 import {
   OptimizationCancelledError,
   runOptimization,
+  type OptimizationLocks,
 } from '../src/simulation/optimizer';
 import type { ChessPiece, SimulationConfig, TrialResult } from '../src/simulation/types';
 import type { WorkerRequest, WorkerResponse } from '../src/workers/protocol';
@@ -34,7 +35,7 @@ function completedTrial(netGold: number): TrialResult {
     netGold,
     activeRerolls: netGold,
     peakBenchSlots: 1,
-    costs: { reroll: netGold, purchases: 0, ban: 0, diceRefund: 0 },
+    costs: { leveling: 0, reroll: netGold, purchases: 0, ban: 0, diceRefund: 0 },
     ioPurchased: 0,
     morningStarTriggers: 0,
   };
@@ -72,6 +73,33 @@ describe('successive-halving optimization orchestration', () => {
     expect(progress.map((item) => item.phase)).toEqual(expect.arrayContaining(['screen', 'confirm', 'refine']));
   });
 
+  it('passes dimension locks into candidate enumeration', async () => {
+    const locks: OptimizationLocks = {
+      level: true,
+      relic: true,
+      talent: true,
+      useIo: true,
+      bannedSynergy: true,
+    };
+    const result = await runOptimization(base, pieces, synergies, {
+      simulate: (config) => completedTrial(config.level),
+      aggregate: aggregateResults,
+      isCancelled: () => false,
+      onProgress: () => {},
+      yieldControl: async () => {},
+      batchSize: 100,
+    }, locks);
+
+    expect(result.candidateCount).toBe(1);
+    expect(result.rankings[0].choice).toMatchObject({
+      level: 8,
+      relic: 'none',
+      talent: 'greed',
+      bannedSynergy: null,
+      useIo: false,
+    });
+  });
+
   it('stops without publishing rankings when cancellation is observed', async () => {
     let calls = 0;
     await expect(runOptimization(base, pieces, synergies, {
@@ -87,8 +115,15 @@ describe('successive-halving optimization orchestration', () => {
     })).rejects.toBeInstanceOf(OptimizationCancelledError);
   });
 
-  it('defines versioned optimization worker messages', () => {
-    const request = { type: 'optimize', requestId: 'request', config: base } satisfies WorkerRequest;
+  it('defines versioned optimization worker messages with dimension locks', () => {
+    const locks: OptimizationLocks = {
+      level: true,
+      relic: false,
+      talent: true,
+      useIo: false,
+      bannedSynergy: true,
+    };
+    const request = { type: 'optimize', requestId: 'request', config: base, locks } satisfies WorkerRequest;
     const progress = {
       type: 'optimization-progress',
       requestId: 'request',
@@ -100,6 +135,7 @@ describe('successive-halving optimization orchestration', () => {
     } satisfies WorkerResponse;
 
     expect(request.type).toBe('optimize');
+    expect(request.locks).toEqual(locks);
     expect(progress.type).toBe('optimization-progress');
   });
 });
